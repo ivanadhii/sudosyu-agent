@@ -42,9 +42,16 @@ type DockerDF struct {
 	BuildCacheReclaimable int64
 }
 
+type cpuSample struct {
+	cpuUsage    uint64
+	systemUsage uint64
+}
+
 type DockerCollector struct {
-	client     *http.Client
-	socketPath string
+	client      *http.Client
+	socketPath  string
+	mu          sync.Mutex
+	prevCPU     map[string]cpuSample
 }
 
 func NewDockerCollector(socketPath string) *DockerCollector {
@@ -56,6 +63,7 @@ func NewDockerCollector(socketPath string) *DockerCollector {
 	return &DockerCollector{
 		client:     &http.Client{Transport: transport, Timeout: 10 * time.Second},
 		socketPath: socketPath,
+		prevCPU:    map[string]cpuSample{},
 	}
 }
 
@@ -138,7 +146,7 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 }
 
 func (d *DockerCollector) fillStats(c *DockerContainer, containerID string) {
-	body, err := d.get("/containers/" + containerID + "/stats?stream=false")
+	body, err := d.get("/containers/" + containerID + "/stats?stream=false&one-shot=true")
 	if err != nil {
 		return
 	}
@@ -151,12 +159,6 @@ func (d *DockerCollector) fillStats(c *DockerContainer, containerID string) {
 			SystemCPUUsage uint64 `json:"system_cpu_usage"`
 			OnlineCPUs     int    `json:"online_cpus"`
 		} `json:"cpu_stats"`
-		PreCPUStats struct {
-			CPUUsage struct {
-				TotalUsage uint64 `json:"total_usage"`
-			} `json:"cpu_usage"`
-			SystemCPUUsage uint64 `json:"system_cpu_usage"`
-		} `json:"precpu_stats"`
 		MemoryStats struct {
 			Usage uint64 `json:"usage"`
 			Limit uint64 `json:"limit"`
@@ -179,15 +181,23 @@ func (d *DockerCollector) fillStats(c *DockerContainer, containerID string) {
 		return
 	}
 
-	// CPU %
-	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage)
-	sysDelta := float64(stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage)
+	// CPU % — calculate delta against our own previous sample
+	curCPU := stats.CPUStats.CPUUsage.TotalUsage
+	curSys := stats.CPUStats.SystemCPUUsage
 	numCPU := stats.CPUStats.OnlineCPUs
 	if numCPU == 0 {
 		numCPU = 1
 	}
+
+	d.mu.Lock()
+	prev, hasPrev := d.prevCPU[containerID]
+	d.prevCPU[containerID] = cpuSample{cpuUsage: curCPU, systemUsage: curSys}
+	d.mu.Unlock()
+
 	var cpuPct float64
-	if sysDelta > 0 {
+	if hasPrev && curSys > prev.systemUsage {
+		cpuDelta := float64(curCPU - prev.cpuUsage)
+		sysDelta := float64(curSys - prev.systemUsage)
 		cpuPct = (cpuDelta / sysDelta) * float64(numCPU) * 100.0
 	}
 	c.CPUPercent = &cpuPct
