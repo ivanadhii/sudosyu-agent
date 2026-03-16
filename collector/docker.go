@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -95,8 +96,10 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 		return nil, err
 	}
 
-	var containers []DockerContainer
-	for _, r := range raw {
+	containers := make([]DockerContainer, len(raw))
+	var wg sync.WaitGroup
+
+	for i, r := range raw {
 		name := r.ID[:12]
 		if len(r.Names) > 0 {
 			name = strings.TrimPrefix(r.Names[0], "/")
@@ -109,7 +112,7 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 			}
 		}
 
-		c := DockerContainer{
+		containers[i] = DockerContainer{
 			ID:           r.ID[:12],
 			Name:         name,
 			Image:        r.Image,
@@ -119,12 +122,16 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 			CreatedAt:    time.Unix(r.Created, 0).UTC().Format(time.RFC3339),
 		}
 
-		if c.Status == "running" {
-			d.fillStats(&c, r.ID)
+		if containers[i].Status == "running" {
+			wg.Add(1)
+			go func(idx int, id string) {
+				defer wg.Done()
+				d.fillStats(&containers[idx], id)
+			}(i, r.ID)
 		}
-
-		containers = append(containers, c)
 	}
+
+	wg.Wait()
 	return containers, nil
 }
 
