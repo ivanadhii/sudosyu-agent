@@ -1,0 +1,11 @@
+services:
+  agent:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      TZ: Asia/Jakarta
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,5 @@
+backend_url: "http://central-server:8080"
+api_key: "your-api-key-here"
+server_name: "my-server"
+interval_seconds: 10
+docker_socket: "/var/run/docker.sock"

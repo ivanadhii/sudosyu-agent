@@ -1,0 +1,5 @@
+backend_url: "http://localhost:8080"
+api_key: "ojFgLe6n0k8JmioURhYbIiup5xb2Qh1iiEiwJRPs"
+server_name: "my-localhost"
+interval_seconds: 10
+docker_socket: "/var/run/docker.sock"
