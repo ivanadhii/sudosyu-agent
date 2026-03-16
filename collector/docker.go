@@ -17,6 +17,7 @@ type DockerContainer struct {
 	Name         string
 	Image        string
 	Status       string
+	Uptime       string
 	RestartCount int
 	Ports        []string
 	CreatedAt    string
