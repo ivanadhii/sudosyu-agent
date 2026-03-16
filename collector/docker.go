@@ -74,12 +74,12 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 	}
 
 	var raw []struct {
-		ID    string `json:"Id"`
-		Names []string
-		Image string
-		State string
-		Status string
-		Ports []struct {
+		ID     string `json:"Id"`
+		Names  []string
+		Image  string
+		State  string
+		Status string // human-readable e.g. "Up 2 hours"
+		Ports  []struct {
 			IP          string
 			PrivatePort int
 			PublicPort  int
@@ -117,6 +117,7 @@ func (d *DockerCollector) CollectContainers() ([]DockerContainer, error) {
 			Name:         name,
 			Image:        r.Image,
 			Status:       strings.ToLower(r.State),
+			Uptime:       r.Status,
 			RestartCount: r.HostConfig.RestartPolicy.MaximumRetryCount,
 			Ports:        ports,
 			CreatedAt:    time.Unix(r.Created, 0).UTC().Format(time.RFC3339),

@@ -152,13 +152,12 @@ func collect(
 	if docker != nil {
 		if containers, err := docker.CollectContainers(); err == nil {
 			for _, c := range containers {
-				uptime := ""
 				payload.Containers = append(payload.Containers, sender.ContainerSnapshot{
 					ContainerID:  c.ID,
 					Name:         c.Name,
 					Image:        c.Image,
 					Status:       c.Status,
-					Uptime:       uptime,
+					Uptime:       c.Uptime,
 					RestartCount: c.RestartCount,
 					Ports:        c.Ports,
 					CPUPercent:   c.CPUPercent,
